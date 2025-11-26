@@ -7,7 +7,7 @@ const COMPANY_NAME = "Favoured"; // change this per company
 document.getElementById("header-title").textContent =
     COMPANY_NAME + " – AI Assistant Demo";
 
-// Conversation history
+// Conversation history for the backend: { role: "user"|"assistant", content: "..." }
 let conversation = [];
 
 /* -----------------------------------------------
@@ -20,6 +20,20 @@ window.onload = () => {
     conversation.push({ role: "assistant", content: greeting });
 
     document.getElementById("business-options").style.display = "flex";
+
+    // Attach Enter key handler once DOM is ready
+    const input = document.getElementById("user-input");
+    input.addEventListener("keydown", function (e) {
+        // Shift + Enter → newline
+        if (e.key === "Enter" && e.shiftKey) {
+            return;
+        }
+        // Enter alone → send
+        if (e.key === "Enter") {
+            e.preventDefault();
+            sendMessage();
+        }
+    });
 };
 
 /* -----------------------------------------------
@@ -32,22 +46,6 @@ function selectBusiness(type) {
     sendToAI();
     document.getElementById("business-options").style.display = "none";
 }
-
-/* -----------------------------------------------
-   SEND MESSAGE ON ENTER KEY
------------------------------------------------- */
-document.getElementById("user-input").addEventListener("keydown", function (e) {
-    // Shift + Enter → add new line
-    if (e.key === "Enter" && e.shiftKey) {
-        return;
-    }
-
-    // Enter (normal) → send message
-    if (e.key === "Enter") {
-        e.preventDefault(); // prevents newline from appearing
-        sendMessage();
-    }
-});
 
 /* -----------------------------------------------
    USER SENDS TEXT MESSAGE
@@ -67,7 +65,7 @@ async function sendMessage() {
 }
 
 /* -----------------------------------------------
-   SEND HISTORY TO BACKEND
+   SEND FULL HISTORY TO BACKEND
 ------------------------------------------------ */
 async function sendToAI() {
     try {
