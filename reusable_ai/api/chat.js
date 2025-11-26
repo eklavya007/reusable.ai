@@ -1,14 +1,7 @@
 // api/chat.js
 
 // ---------------------------------------------------------
-// SINGLE-COMPANY CONFIG ("DATABASE")
-// ---------------------------------------------------------
-//
-// This is the ONLY part you need to edit when you make
-// a new demo for a different company.
-//
-// 1. Change COMPANY_NAME
-// 2. Replace COMPANY_CONTEXT with the block I generate for you
+// SINGLE-COMPANY CONFIG
 // ---------------------------------------------------------
 
 const COMPANY_NAME = "Favoured";
@@ -74,10 +67,10 @@ USPs & positioning:
   digital-first brands.
 
 How you as the assistant should respond for Favoured:
-- Ask clarifying questions about:
-  - The user's business type (eCom, app, SaaS, service, etc.).
-  - Their main goal (more sales, more leads, better ROAS, lower CAC, better LTV, launch a new channel, etc.).
-  - Budget level and key markets if relevant.
+- You can ask a couple of clarifying questions at the start of the conversation
+  (e.g. business type and main goal), but:
+  - DO NOT keep repeating the same questions if the user has already answered them earlier.
+  - Use the previous messages in this chat to remember what they told you.
 - Recommend channel mixes and tactics that fit Favoured's strengths:
   - For eCommerce: TikTok + Meta for acquisition, Google for intent, email/push for LTV, CRO on site.
   - For apps: UAC, Apple Search Ads, TikTok/App-focused creatives, onboarding and retention flows.
@@ -92,7 +85,7 @@ How you as the assistant should respond for Favoured:
 `;
 
 // ---------------------------------------------------------
-// VERCEL EDGE FUNCTION
+// EDGE FUNCTION
 // ---------------------------------------------------------
 export const config = {
   runtime: "edge",
@@ -108,18 +101,18 @@ export default async function handler(req) {
     }
 
     const body = await req.json();
-    const userMessage = body.message || "";
+    // history is an array of { role, content } from the frontend
+    const history = Array.isArray(body.history) ? body.history : [];
+    const lastUserMessage =
+      history.filter(m => m.role === "user").slice(-1)[0]?.content || "";
 
-    if (!userMessage) {
+    if (!lastUserMessage) {
       return new Response(
         JSON.stringify({ error: "No message provided" }),
         { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }
 
-    // -----------------------------------------------------
-    // SYSTEM PROMPT – uses the single COMPANY profile
-    // -----------------------------------------------------
     const systemPrompt = `
 You are an AI assistant built specifically for ${COMPANY_NAME}.
 
@@ -127,13 +120,21 @@ Use the following company-specific context to guide your answers:
 ${COMPANY_CONTEXT}
 
 General rules:
-- Always answer as an assistant designed for ${COMPANY_NAME}.
-- Ask 1–2 clarifying questions about the user's business and goals
-  before going very deep into strategy.
-- Be practical, concrete and focused on real business outcomes.
+- You are having a multi-turn conversation. Use the previous messages (history)
+  to remember what the user has already told you.
+- Do NOT keep asking the same clarifying question (like business type or goals)
+  if it has already been answered earlier in this chat.
+- Ask 1–2 clarifying questions early in the conversation if important details
+  are missing, then move on to giving concrete, helpful recommendations.
+- Be practical, specific and focused on real business outcomes.
 - If you don't know specific internal details (pricing, internal tools, etc.),
   say so and keep your advice general and realistic.
     `;
+
+    const messages = [
+      { role: "system", content: systemPrompt },
+      ...history,
+    ];
 
     const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -143,10 +144,7 @@ General rules:
       },
       body: JSON.stringify({
         model: "gpt-4o-mini",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userMessage },
-        ],
+        messages,
       }),
     });
 
