@@ -70,7 +70,7 @@ How you as the assistant should respond for Favoured:
 - You can ask a couple of clarifying questions at the start of the conversation
   (e.g. business type and main goal), but:
   - DO NOT keep repeating the same questions if the user has already answered them earlier.
-  - Use the previous messages in this chat to remember what they told you.
+  - Use the previous messages in this chat (history) to remember what they told you.
 - Recommend channel mixes and tactics that fit Favoured's strengths:
   - For eCommerce: TikTok + Meta for acquisition, Google for intent, email/push for LTV, CRO on site.
   - For apps: UAC, Apple Search Ads, TikTok/App-focused creatives, onboarding and retention flows.
@@ -101,10 +101,15 @@ export default async function handler(req) {
     }
 
     const body = await req.json();
+
     // history is an array of { role, content } from the frontend
     const history = Array.isArray(body.history) ? body.history : [];
+
+    // Get the last user message from history (or fallback)
     const lastUserMessage =
-      history.filter(m => m.role === "user").slice(-1)[0]?.content || "";
+      history.filter(m => m.role === "user").slice(-1)[0]?.content ||
+      body.message ||
+      "";
 
     if (!lastUserMessage) {
       return new Response(
@@ -134,6 +139,9 @@ General rules:
     const messages = [
       { role: "system", content: systemPrompt },
       ...history,
+      // In case the frontend ever sends only message (no history),
+      // we still add the latest user message:
+      ...(history.length === 0 ? [{ role: "user", content: lastUserMessage }] : [])
     ];
 
     const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
